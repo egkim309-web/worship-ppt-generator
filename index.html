@@ -53,7 +53,8 @@
   }
   textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
   .row2 { display: flex; gap: 12px; }
-  .row2 > div { flex: 1; }
+  .row2 > div { flex: 1 1 0; min-width: 0; }
+  .row2 input[type=date] { min-width: 0; }
   .song {
     border: 1px solid #e0ddd3;
     border-radius: 10px;
@@ -117,6 +118,53 @@
   }
   .status.ok { color: #2a7d46; font-weight: 600; }
   .status.err { color: #b23b3b; font-weight: 600; }
+  .dropdown { position: relative; }
+  .dropdown-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #d9d5c8;
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 400;
+    background: #fdfcf9;
+    color: #333;
+  }
+  .dropdown-toggle:hover { background: #f6f4ee; }
+  .dropdown-toggle > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dropdown-toggle .placeholder { color: #999; }
+  .dropdown-caret { color: #999; font-size: 12px; transition: transform .15s; }
+  .dropdown.open .dropdown-caret { transform: rotate(180deg); }
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #d9d5c8;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    z-index: 20;
+  }
+  .dropdown-menu li {
+    padding: 9px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .dropdown-menu li:hover { background: #f1efe8; }
+  .dropdown-menu li[aria-selected="true"] { background: #111; color: #fff; }
 </style>
 <script>
 /* PptxGenJS 4.0.1 @ 2025-06-25T23:35:35.101Z */
@@ -221,7 +269,7 @@
 <body>
 <div class="wrap">
   <h1>예배 찬양 PPT 생성기</h1>
-  <p class="sub">고정 순서(성경 66권 찬양 + 사도신경)는 그대로 두고, 그날의 찬양 가사만 입력하면 원본과 같은 스타일의 .pptx가 만들어집니다.</p>
+  <p class="sub">고정 순서는 그대로 두고, 그날의 찬양 가사만 입력하면 원본과 같은 스타일의 .pptx가 만들어집니다.</p>
 
   <div class="card">
     <h2>예배 정보</h2>
@@ -231,13 +279,23 @@
         <input type="date" id="svcDate">
       </div>
       <div>
-        <label>예배 이름 (파일명에 사용)</label>
-        <input type="text" id="svcName" placeholder="예: 다니엘 예배" value="다니엘 예배">
+        <label>예배</label>
+        <div class="dropdown" id="svcNameDropdown">
+          <button type="button" class="dropdown-toggle" id="svcNameToggle" aria-haspopup="listbox" aria-expanded="false">
+            <span id="svcNameLabel" class="placeholder">예배 선택</span>
+            <span class="dropdown-caret" aria-hidden="true">▾</span>
+          </button>
+          <ul class="dropdown-menu" id="svcNameMenu" role="listbox" hidden>
+            <li role="option" data-value="여호수아" aria-selected="false">여호수아</li>
+            <li role="option" data-value="다니엘" aria-selected="false">다니엘</li>
+          </ul>
+        </div>
+        <input type="hidden" id="svcName" value="">
       </div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card svc-step" id="fixedOrderCard" hidden>
     <h2>고정 순서 (자동 포함, 수정 불필요)</h2>
     <div class="fixed-preview">
       <div class="fixed-chip"><b>① 성경 66권 찬양</b><span>11장 · 매주 고정</span></div>
@@ -246,8 +304,8 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2>그 날의 찬양</h2>
+  <div class="card svc-step" id="daySongsCard" hidden>
+    <h2>찬양 가사</h2>
     <div id="songList"></div>
     <button class="btn-add" id="addSongBtn" type="button">+ 찬양 추가</button>
     <p class="hint">
@@ -257,8 +315,10 @@
     </p>
   </div>
 
-  <button class="btn-generate" id="generateBtn" type="button">PPT 다운로드 생성</button>
-  <div class="status" id="statusMsg"></div>
+  <div class="svc-step" id="generateSection" hidden>
+    <button class="btn-generate" id="generateBtn" type="button">PPT 다운로드 생성</button>
+    <div class="status" id="statusMsg"></div>
+  </div>
 </div>
 
 <script>
@@ -302,7 +362,7 @@ function addSongRow(title) {
       '<span>찬양 ' + id + '</span>' +
       '<button class="btn-remove" type="button" onclick="removeSong(' + id + ')">삭제</button>' +
     '</div>' +
-    '<label>찬양 제목 (파일명 참고용)</label>' +
+    '<label>찬양 제목</label>' +
     '<input type="text" class="songTitle" placeholder="예: Yes and Amen">' +
     '<label style="margin-top:8px;">가사 (빈 줄로 슬라이드 구분)</label>' +
     '<textarea class="songLyrics" placeholder="God says yes 내게 축복있네\nyes 내게 평안있네\n\nYes 내게 소망있네\nYes 나는 치유됐네"></textarea>';
@@ -460,6 +520,63 @@ document.getElementById("generateBtn").addEventListener("click", function () {
     genBtn.disabled = false;
   }
 });
+
+// 예배 선택 드롭다운(탭)
+(function () {
+  const dd = document.getElementById("svcNameDropdown");
+  const toggle = document.getElementById("svcNameToggle");
+  const menu = document.getElementById("svcNameMenu");
+  const labelEl = document.getElementById("svcNameLabel");
+  const hidden = document.getElementById("svcName");
+  const steps = document.querySelectorAll(".svc-step");
+  if (!dd || !toggle || !menu || !labelEl || !hidden) return;
+
+  // 아래 입력 단계(고정 순서 · 그 날의 찬양 · 다운로드)를 보여줄 예배 종류
+  const WORSHIP_WITH_STEPS = ["다니엘"];
+
+  function updateSteps(val) {
+    const show = WORSHIP_WITH_STEPS.indexOf(val) !== -1;
+    steps.forEach(function (el) { el.hidden = !show; });
+  }
+  updateSteps(hidden.value);
+
+  function openMenu() {
+    dd.classList.add("open");
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+  }
+  function closeMenu() {
+    dd.classList.remove("open");
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+  }
+
+  toggle.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (menu.hidden) openMenu(); else closeMenu();
+  });
+
+  menu.querySelectorAll("li").forEach(function (li) {
+    li.addEventListener("click", function () {
+      const val = li.dataset.value;
+      hidden.value = val;
+      labelEl.textContent = val;
+      labelEl.classList.remove("placeholder");
+      menu.querySelectorAll("li").forEach(function (x) {
+        x.setAttribute("aria-selected", x === li ? "true" : "false");
+      });
+      updateSteps(val);
+      closeMenu();
+    });
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!dd.contains(e.target)) closeMenu();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeMenu();
+  });
+})();
 </script>
 </body>
 </html>
