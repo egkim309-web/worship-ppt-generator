@@ -723,19 +723,28 @@ document.getElementById("generateBtn").addEventListener("click", async function 
     }
 
     const dateVal = document.getElementById("svcDate").value;
-    let datePart = "";
+    let dateStr = "";
     if (dateVal) {
       const d = new Date(dateVal + "T00:00:00");
       const yy = String(d.getFullYear()).slice(2);
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       const dd = String(d.getDate()).padStart(2, "0");
-      datePart = yy + "." + mm + "." + dd + ". ";
+      dateStr = yy + "." + mm + "." + dd;
     }
     const songNames = songs
       .map((s) => s.title.replace(/[\\/:*?"<>|_]/g, " ").replace(/\s+/g, " ").trim())
       .join(", ");
-    const fileName =
-      datePart + nameVal + (songNames ? " (" + songNames + ")" : "") + ".pptx";
+
+    let fileName;
+    if (cfg.type === "template") {
+      // 바울부: "바울부 26.09.06 (곡1, 곡2, ...).pptx"
+      fileName = nameVal + (dateStr ? " " + dateStr : "") +
+        (songNames ? " (" + songNames + ")" : "") + ".pptx";
+    } else {
+      // 다니엘/여호수아: "26.09.06. 예배명 (곡1, 곡2).pptx"
+      const datePart = dateStr ? dateStr + ". " : "";
+      fileName = datePart + nameVal + (songNames ? " (" + songNames + ")" : "") + ".pptx";
+    }
 
     if (cfg.type === "template") {
       const blob = await buildPaulDeck(cfg, songs);
